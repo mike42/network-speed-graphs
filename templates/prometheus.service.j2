@@ -1,0 +1,8 @@
+[Unit]
+After=network.target
+
+[Service]
+ExecStart=/opt/prometheus-1.7.0.linux-armv7/prometheus
+User=prometheus
+WorkingDirectory=/opt/prometheus-1.7.0.linux-armv7/
+

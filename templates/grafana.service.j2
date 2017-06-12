@@ -1,0 +1,7 @@
+[Unit]
+After=network.target
+
+[Service]
+ExecStart=/opt/grafana-4.3.2/bin/grafana-server
+User=grafana
+WorkingDirectory=/opt/grafana-4.3.2

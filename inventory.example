@@ -1,0 +1,2 @@
+[pi]
+example-pi ansible_host=192.168.0.x ansible_user=root

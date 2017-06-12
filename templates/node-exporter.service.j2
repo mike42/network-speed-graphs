@@ -1,0 +1,8 @@
+[Unit]
+After=network.target
+
+[Service]
+ExecStart=/opt/node_exporter-0.14.0.linux-armv7/node_exporter
+User=prometheus
+WorkingDirectory=/opt/node_exporter-0.14.0.linux-armv7
+

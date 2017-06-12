@@ -1,0 +1,8 @@
+[Unit]
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python /opt/sagemcom_3864_exporter.py
+User=prometheus
+WorkingDirectory=/opt
+

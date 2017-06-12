@@ -1,0 +1,115 @@
+- hosts: pi
+  tasks:
+    - package: name="{{ item }}" state=present
+      with_items:
+      - curl
+      - firewalld
+      - python-pip
+      - nginx
+      - ssl-cert
+
+    - pip: name=prometheus_client state=present
+
+    - service: name=firewalld state=running
+
+    # Prometheus itself
+    - shell: curl --location https://github.com/prometheus/prometheus/releases/download/v1.7.0/prometheus-1.7.0.linux-armv7.tar.gz > /opt/prometheus-1.7.0.linux-armv7.tar.gz
+      args:
+        creates: /opt/prometheus-1.7.0.linux-armv7.tar.gz
+
+    - user: name=prometheus state=present
+
+    - shell: tar -xzf prometheus-1.7.0.linux-armv7.tar.gz && chown -R prometheus:prometheus prometheus-1.7.0.linux-armv7
+      args:
+        chdir: /opt
+        creates: /opt/prometheus-1.7.0.linux-armv7
+
+    - template: src=prometheus.yml.j2 dest=/opt/prometheus-1.7.0.linux-armv7/prometheus.yml owner=prometheus group=prometheus
+      notify: restart prometheus
+
+    - template: src=prometheus.service.j2 dest=/etc/systemd/system/prometheus.service
+      notify: reload systemd
+
+    - meta: flush_handlers
+
+    - service: name=prometheus state=running enabled=yes
+
+    # Node exporter
+    - shell: curl --location https://github.com/prometheus/node_exporter/releases/download/v0.14.0/node_exporter-0.14.0.linux-armv7.tar.gz > /opt/node_exporter-0.14.0.linux-armv7.tar.gz
+      args:
+        creates: /opt/node_exporter-0.14.0.linux-armv7.tar.gz
+
+    - shell: tar -xzf node_exporter-0.14.0.linux-armv7.tar.gz && chown -R prometheus:prometheus node_exporter-0.14.0.linux-armv7
+      args:
+        chdir: /opt
+        creates: /opt/node_exporter-0.14.0.linux-armv7
+
+    - template: src=node-exporter.service.j2 dest=/etc/systemd/system/node-exporter.service
+      notify: reload systemd
+
+    - meta: flush_handlers
+
+    - service: name=node-exporter state=running enabled=yes
+
+    # Custom exporter
+    - copy: src=exporter/sagemcom_3864_exporter.py dest=/opt/sagemcom_3864_exporter.py
+      notify: restart sagemcom-3864-exporter
+
+    - template: src=sagemcom-3864-exporter.service.j2 dest=/etc/systemd/system/sagemcom-3864-exporter.service
+      notify: reload systemd
+
+    - meta: flush_handlers
+
+    - service: name=sagemcom-3864-exporter state=running enabled=yes
+
+    # Grafana
+    - shell: curl --location https://github.com/fg2it/grafana-on-raspberry/releases/download/v4.3.2/grafana-4.3.2.linux-armhf.tar.gz > /opt/grafana-4.3.2.linux-armhf.tar.gz
+      args:
+        creates: /opt/grafana-4.3.2.linux-armhf.tar.gz
+
+    - user: name=grafana state=present
+
+    - shell: tar -xzf grafana-4.3.2.linux-armhf.tar.gz && chown -R grafana:grafana grafana-4.3.2
+      args:
+        chdir: /opt
+        creates: /opt/grafana-4.3.2
+
+    - template: src=grafana.service.j2 dest=/etc/systemd/system/grafana.service
+      notify: reload systemd
+
+    - meta: flush_handlers
+
+    - service: name=grafana state=running enabled=yes
+
+    # nginx front-end
+    - template: src=default.j2 dest=/etc/nginx/sites-available/default
+      notify: reload nginx
+      tags: web
+
+    - service: name=nginx state=running enabled=yes
+      tags: web
+
+    - firewalld:
+        service: "{{ item }}"
+        permanent: true
+        state: enabled
+      with_items:
+        - https
+        - http
+      notify: reload firewalld
+
+  handlers:
+    - name: reload systemd
+      command: systemctl daemon-reload
+
+    - name: reload nginx
+      service: name=nginx state=reloaded enabled=yes
+
+    - name: reload firewalld
+      command: firewall-cmd --reload
+
+    - name: restart sagemcom-3864-exporter
+      service: name=sagemcom-3864-exporter state=restarted enabled=yes
+
+    - name: restart prometheus
+      service: name=prometheus state=restarted enabled=yes
